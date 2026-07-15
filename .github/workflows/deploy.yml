@@ -43,7 +43,8 @@ jobs:
                 for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
                 const base64Content = btoa(binary);
                 const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-                const path = `notes/${Date.now()}_${safeName}`;
+                const folder = (formData.get('folder') === 'library') ? 'library' : 'notes';
+const path = `${folder}/${Date.now()}_${safeName}`;
                 const owner = env.GH_OWNER;
                 const repo = env.GH_REPO;
                 const token = env.GH_TOKEN;
