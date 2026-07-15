@@ -44,9 +44,9 @@ jobs:
                 const base64Content = btoa(binary);
                 const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
                 const path = `notes/${Date.now()}_${safeName}`;
-                const owner = env.GITHUB_OWNER;
-                const repo = env.GITHUB_REPO;
-                const token = env.GITHUB_TOKEN;
+                const owner = env.GH_OWNER;
+                const repo = env.GH_REPO;
+                const token = env.GH_TOKEN;
                 const ghRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
                   method: 'PUT',
                   headers: {
@@ -89,10 +89,10 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           secrets: |
-            GITHUB_OWNER
-            GITHUB_REPO
-            GITHUB_TOKEN
+            GH_OWNER
+            GH_REPO
+            GH_TOKEN
         env:
-          GITHUB_OWNER: mahibub7860-ov
-          GITHUB_REPO: onlyvet-notes
-          GITHUB_TOKEN: ${{ secrets.WORKER_GITHUB_TOKEN }}
+          GH_OWNER: mahibub7860-ov
+          GH_REPO: onlyvet-notes
+          GH_TOKEN: ${{ secrets.WORKER_GITHUB_TOKEN }}
