@@ -1,0 +1,98 @@
+# v2
+name: Deploy Worker
+on:
+  push:
+    paths:
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create worker file
+        run: |
+          mkdir -p src
+          cat > src/index.js << 'EOF'
+          export default {
+            async fetch(request, env) {
+              const corsHeaders = {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+              };
+              if (request.method === 'OPTIONS') {
+                return new Response(null, { headers: corsHeaders });
+              }
+              if (request.method !== 'POST') {
+                return new Response('Method not allowed', { status: 405, headers: corsHeaders });
+              }
+              try {
+                const formData = await request.formData();
+                const file = formData.get('file');
+                if (!file) {
+                  return new Response(JSON.stringify({ error: 'No file provided' }), {
+                    status: 400,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  });
+                }
+                const arrayBuffer = await file.arrayBuffer();
+                const bytes = new Uint8Array(arrayBuffer);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                const base64Content = btoa(binary);
+                const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                const path = `notes/${Date.now()}_${safeName}`;
+                const owner = env.GITHUB_OWNER;
+                const repo = env.GITHUB_REPO;
+                const token = env.GITHUB_TOKEN;
+                const ghRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'User-Agent': 'onlyvet-uploader',
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ message: `Upload ${safeName}`, content: base64Content }),
+                });
+                if (!ghRes.ok) {
+                  const errText = await ghRes.text();
+                  return new Response(JSON.stringify({ error: 'GitHub upload failed: ' + errText }), {
+                    status: 500,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  });
+                }
+                const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}`;
+                return new Response(JSON.stringify({ url: rawUrl }), {
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                });
+              } catch (e) {
+                return new Response(JSON.stringify({ error: e.message }), {
+                  status: 500,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                });
+              }
+            },
+          };
+          EOF
+      - name: Create wrangler config
+        run: |
+          cat > wrangler.toml << 'EOF'
+          name = "onlyvet-uploads"
+          main = "src/index.js"
+          compatibility_date = "2024-01-01"
+          EOF
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          secrets: |
+            GITHUB_OWNER
+            GITHUB_REPO
+            GITHUB_TOKEN
+        env:
+          GITHUB_OWNER: mahibub7860-ov
+          GITHUB_REPO: onlyvet-notes
+          GITHUB_TOKEN: ${{ secrets.WORKER_GITHUB_TOKEN }}
